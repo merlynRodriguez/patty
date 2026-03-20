@@ -212,7 +212,10 @@ export default function OperatorPanel() {
   ) => (
     <form onSubmit={onSubmit}>
       <div className="form-section fade-in">
-        <h3 className="form-title">{title} — {selectedMesa}</h3>
+        <h2 style={{ textAlign: 'center', marginBottom: '0.5rem', color: 'var(--brand-burgundy)', fontSize: '1.5rem', fontWeight: 'bold' }}>
+          Mesa {selectedMesa.split('-M')[1]?.replace(/^0/, '')}
+        </h2>
+        <h3 className="form-title">{title}</h3>
         {PARTIDOS.map((p, i) => (
           <div key={p.id} className="vote-row">
             <div className="vote-color-dot" style={{ backgroundColor: p.hex }} />
