@@ -222,6 +222,8 @@ export default function Dashboard() {
             <div className="winner-card">
               {winner ? (
                 <>
+                  <div className="winner-label-top">Candidato con más Votos</div>
+                  <div className="winner-label-bottom">Próximo Alcalde</div>
                   <img
                     src={`/candidatos/${winner.candidato.id}.jpg`}
                     alt={winner.candidato.nombre}
@@ -252,6 +254,7 @@ export default function Dashboard() {
       {tab === 'concejo' && (
         <div className="fade-in">
           <div className="seats-section">
+            <h3 className="section-title">Composición del Concejo Municipal</h3>
             <div className="seats-grid">
               {totalVotos(totConcejo) > 0 ? (
                 calculateSeats(totConcejo).map((seat, i) => (
