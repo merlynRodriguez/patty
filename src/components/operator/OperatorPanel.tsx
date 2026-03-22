@@ -212,6 +212,17 @@ export default function OperatorPanel() {
   ) => (
     <form onSubmit={onSubmit}>
       <div className="form-section fade-in">
+        <button 
+          type="button" 
+          className="btn btn-secondary" 
+          style={{ marginBottom: '1.5rem', width: '100%', fontWeight: 'bold' }} 
+          onClick={() => {
+            setStep('select')
+            setSelectedMesa('')
+          }}
+        >
+          ← Volver a elegir mesa
+        </button>
         <h2 style={{ textAlign: 'center', marginBottom: '0.5rem', color: 'var(--brand-burgundy)', fontSize: '1.5rem', fontWeight: 'bold' }}>
           Mesa {selectedMesa.split('-M')[1]?.replace(/^0/, '')}
         </h2>
@@ -280,7 +291,7 @@ export default function OperatorPanel() {
       <div className="dashboard-header" style={{ marginBottom: '2rem' }}>
         <div className="dashboard-header-left">
           <h1>Portal del Operador</h1>
-          <h2>{recinto.nombre}</h2>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{recinto.nombre}</h2>
         </div>
         <div className="dashboard-header-right">
           <span className="party-name">ALIANZA</span>
