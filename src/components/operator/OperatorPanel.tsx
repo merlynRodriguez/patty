@@ -18,14 +18,21 @@ export default function OperatorPanel() {
   const [nulosA, setNulosA] = useState<string>('')
   const [blancosC, setBlancosC] = useState<string>('')
   const [nulosC, setNulosC] = useState<string>('')
-  const [foto, setFoto] = useState<File|null>(null)
-  const [fotoPreview, setFotoPreview] = useState('')
+  // Foto alcalde
+  const [fotoAlcalde, setFotoAlcalde] = useState<File|null>(null)
+  const [fotoAlcaldePreview, setFotoAlcaldePreview] = useState('')
+  // Foto concejo
+  const [fotoConcejo, setFotoConcejo] = useState<File|null>(null)
+  const [fotoConcejoPreview, setFotoConcejoPreview] = useState('')
+
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{type:'success'|'error', text:string}|null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const cameraRef = useRef<HTMLInputElement>(null)
+  const fileRefAlcalde = useRef<HTMLInputElement>(null)
+  const cameraRefAlcalde = useRef<HTMLInputElement>(null)
+  const fileRefConcejo = useRef<HTMLInputElement>(null)
+  const cameraRefConcejo = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!recinto) return
@@ -59,7 +66,9 @@ export default function OperatorPanel() {
     setVotosConcejo({ ...empty })
     setBlancosA(''); setNulosA('')
     setBlancosC(''); setNulosC('')
-    setFoto(null); setFotoPreview(''); setEditMode(false)
+    setFotoAlcalde(null); setFotoAlcaldePreview('')
+    setFotoConcejo(null); setFotoConcejoPreview('')
+    setEditMode(false)
   }
 
   const selectMesa = async (mesaId: string) => {
@@ -69,14 +78,12 @@ export default function OperatorPanel() {
 
     const mesa = mesas.find(m => m.id === mesaId)
     if (mesa?.verificada) {
-      // Already verified, cannot edit
       setStep('select')
       setMsg({ type: 'error', text: 'Esta mesa ya fue verificada y no puede editarse.' })
       return
     }
 
     if (mesa?.escrutada) {
-      // Load existing data for editing
       setEditMode(true)
       const { data: vA } = await supabaseA.from('votos_alcalde').select('*').eq('mesa_id', mesaId).single()
       const { data: vC } = await supabaseA.from('votos_concejo').select('*').eq('mesa_id', mesaId).single()
@@ -85,13 +92,14 @@ export default function OperatorPanel() {
         PARTIDO_IDS.forEach(k => { va[k] = vA[k] !== null ? String(vA[k]) : '' })
         setVotosAlcalde(va)
         setBlancosA(vA.blancos !== null ? String(vA.blancos) : ''); setNulosA(vA.nulos !== null ? String(vA.nulos) : '')
-        if (vA.foto_url) setFotoPreview(vA.foto_url)
+        if (vA.foto_url) setFotoAlcaldePreview(vA.foto_url)
       }
       if (vC) {
         const vc: Record<string,string> = {}
         PARTIDO_IDS.forEach(k => { vc[k] = vC[k] !== null ? String(vC[k]) : '' })
         setVotosConcejo(vc)
         setBlancosC(vC.blancos !== null ? String(vC.blancos) : ''); setNulosC(vC.nulos !== null ? String(vC.nulos) : '')
+        if (vC.foto_url) setFotoConcejoPreview(vC.foto_url)
       }
       setStep('alcalde')
     } else {
@@ -103,29 +111,41 @@ export default function OperatorPanel() {
     }
   }
 
-  const handleImageSelect = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const compressImage = async (file: File): Promise<File> => {
     try {
-      const compressed = await imageCompression(file, {
-        maxSizeMB: 0.5,
-        maxWidthOrHeight: 1200,
-        useWebWorker: true
+      return await imageCompression(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.85,
       })
-      setFoto(compressed)
-      setFotoPreview(URL.createObjectURL(compressed))
     } catch {
-      setFoto(file)
-      setFotoPreview(URL.createObjectURL(file))
+      return file
     }
   }
 
-  const uploadImage = async (): Promise<string|null> => {
-    if (!foto) return fotoPreview || null
-    const fileName = `${selectedMesa}-${Date.now()}.jpg`
+  const handleAlcaldeImage = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const compressed = await compressImage(file)
+    setFotoAlcalde(compressed)
+    setFotoAlcaldePreview(URL.createObjectURL(compressed))
+  }
+
+  const handleConcejoImage = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const compressed = await compressImage(file)
+    setFotoConcejo(compressed)
+    setFotoConcejoPreview(URL.createObjectURL(compressed))
+  }
+
+  const uploadImage = async (file: File|null, existingUrl: string, suffix: string): Promise<string|null> => {
+    if (!file) return existingUrl || null
+    const fileName = `${selectedMesa}-${suffix}-${Date.now()}.jpg`
     const { error } = await supabaseA.storage
       .from('actas')
-      .upload(fileName, foto, { contentType: 'image/jpeg', upsert: true })
+      .upload(fileName, file, { contentType: 'image/jpeg', upsert: true })
     if (error) { console.error('Upload error:', error); return null }
     const { data: urlData } = supabaseA.storage.from('actas').getPublicUrl(fileName)
     return urlData.publicUrl
@@ -135,14 +155,14 @@ export default function OperatorPanel() {
     e.preventDefault()
     setSaving(true); setMsg(null)
     try {
-      const fotoUrl = await uploadImage()
+      const fotoUrl = await uploadImage(fotoAlcalde, fotoAlcaldePreview, 'alcalde')
       const payload: any = { 
         mesa_id: selectedMesa, 
-        blancos: blancosA === '' ? null : Number(blancosA), 
-        nulos: nulosA === '' ? null : Number(nulosA) 
+        blancos: blancosA === '' ? 0 : Number(blancosA), 
+        nulos: nulosA === '' ? 0 : Number(nulosA) 
       }
       if (fotoUrl) payload.foto_url = fotoUrl
-      PARTIDO_IDS.forEach(k => { payload[k] = votosAlcalde[k] === '' ? null : Number(votosAlcalde[k]) })
+      PARTIDO_IDS.forEach(k => { payload[k] = votosAlcalde[k] === '' ? 0 : Number(votosAlcalde[k]) })
 
       if (editMode) {
         const { error } = await supabaseA.from('votos_alcalde')
@@ -163,12 +183,14 @@ export default function OperatorPanel() {
     e.preventDefault()
     setSaving(true); setMsg(null)
     try {
+      const fotoUrl = await uploadImage(fotoConcejo, fotoConcejoPreview, 'concejo')
       const payload: any = { 
         mesa_id: selectedMesa, 
-        blancos: blancosC === '' ? null : Number(blancosC), 
-        nulos: nulosC === '' ? null : Number(nulosC) 
+        blancos: blancosC === '' ? 0 : Number(blancosC), 
+        nulos: nulosC === '' ? 0 : Number(nulosC) 
       }
-      PARTIDO_IDS.forEach(k => { payload[k] = votosConcejo[k] === '' ? null : Number(votosConcejo[k]) })
+      if (fotoUrl) payload.foto_url = fotoUrl
+      PARTIDO_IDS.forEach(k => { payload[k] = votosConcejo[k] === '' ? 0 : Number(votosConcejo[k]) })
 
       if (editMode) {
         const { data: existing } = await supabaseA.from('votos_concejo').select('id').eq('mesa_id', selectedMesa).single()
@@ -200,6 +222,33 @@ export default function OperatorPanel() {
     }
     setSaving(false)
   }
+
+  const renderImageUpload = (
+    label: string,
+    preview: string,
+    fileInputRef: React.RefObject<HTMLInputElement | null>,
+    cameraInputRef: React.RefObject<HTMLInputElement | null>,
+    handleImage: (e: ChangeEvent<HTMLInputElement>) => void
+  ) => (
+    <div className="image-upload-section fade-in">
+      <h3 className="form-title" style={{ marginBottom: '0.75rem' }}>{label}</h3>
+      {preview && (
+        <img src={preview} alt="Preview" className="image-upload-preview" />
+      )}
+      <input type="file" accept="image/*" ref={fileInputRef} style={{display:'none'}}
+        onChange={handleImage} />
+      <input type="file" accept="image/*" capture="environment" ref={cameraInputRef}
+        style={{display:'none'}} onChange={handleImage} />
+      <div className="image-upload-btns">
+        <button type="button" className="btn btn-secondary" onClick={()=>cameraInputRef.current?.click()}>
+          📷 Cámara
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={()=>fileInputRef.current?.click()}>
+          🖼️ Galería
+        </button>
+      </div>
+    </div>
+  )
 
   const renderVoteForm = (
     title: string,
@@ -255,25 +304,20 @@ export default function OperatorPanel() {
         </div>
       </div>
 
-      {isAlcalde && (
-        <div className="image-upload-section fade-in">
-          <h3 className="form-title" style={{ marginBottom: '0.75rem' }}>Foto del Acta</h3>
-          {fotoPreview && (
-            <img src={fotoPreview} alt="Preview" className="image-upload-preview" />
-          )}
-          <input type="file" accept="image/*" ref={fileRef} style={{display:'none'}}
-            onChange={handleImageSelect} />
-          <input type="file" accept="image/*" capture="environment" ref={cameraRef}
-            style={{display:'none'}} onChange={handleImageSelect} />
-          <div className="image-upload-btns">
-            <button type="button" className="btn btn-secondary" onClick={()=>cameraRef.current?.click()}>
-              📷 Cámara
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={()=>fileRef.current?.click()}>
-              🖼️ Galería
-            </button>
-          </div>
-        </div>
+      {isAlcalde && renderImageUpload(
+        'Foto del Acta - Alcalde',
+        fotoAlcaldePreview,
+        fileRefAlcalde,
+        cameraRefAlcalde,
+        handleAlcaldeImage
+      )}
+
+      {!isAlcalde && renderImageUpload(
+        'Foto del Acta - Concejo',
+        fotoConcejoPreview,
+        fileRefConcejo,
+        cameraRefConcejo,
+        handleConcejoImage
       )}
 
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>

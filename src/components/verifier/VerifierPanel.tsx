@@ -34,6 +34,13 @@ export default function VerifierPanel() {
   const [mesasForRecinto, setMesasForRecinto] = useState<number>(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState(1)
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const zoomContainerRef = useRef<HTMLDivElement>(null)
+
   // Fetch review queue
   const fetchQueue = async () => {
     const { data } = await supabaseA
@@ -57,11 +64,10 @@ export default function VerifierPanel() {
 
   useEffect(() => {
     fetchQueue()
-    const interval = setInterval(fetchQueue, 30000) // Refresh queue every 30s
+    const interval = setInterval(fetchQueue, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // When recinto changes, update mesa count
   useEffect(() => {
     if (selectedRecinto) {
       const r = RECINTO_MAP[selectedRecinto]
@@ -81,6 +87,9 @@ export default function VerifierPanel() {
     setBlancosC(''); setNulosC('')
     setFotoUrl(''); setNewFoto(null); setNewFotoPreview('')
     setIsNewMesa(false); setMsg(null)
+    // Reset zoom
+    setZoomLevel(1)
+    setPanOffset({ x: 0, y: 0 })
   }
 
   const loadMesa = async (mesaId: string) => {
@@ -127,7 +136,7 @@ export default function VerifierPanel() {
     if (!file) return
     try {
       const compressed = await imageCompression(file, {
-        maxSizeMB: 0.5, maxWidthOrHeight: 1200, useWebWorker: true
+        maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true, initialQuality: 0.85
       })
       setNewFoto(compressed)
       setNewFotoPreview(URL.createObjectURL(compressed))
@@ -136,6 +145,48 @@ export default function VerifierPanel() {
       setNewFotoPreview(URL.createObjectURL(file))
     }
   }
+
+  // Zoom handlers
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.5, 5))
+  }
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoomLevel - 0.5, 1)
+    setZoomLevel(newZoom)
+    if (newZoom === 1) setPanOffset({ x: 0, y: 0 })
+  }
+  const handleZoomReset = () => {
+    setZoomLevel(1)
+    setPanOffset({ x: 0, y: 0 })
+  }
+
+  // Pan handlers for mouse
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel <= 1) return
+    e.preventDefault()
+    setIsPanning(true)
+    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y })
+  }
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return
+    e.preventDefault()
+    setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y })
+  }
+  const handleMouseUp = () => setIsPanning(false)
+
+  // Pan handlers for touch
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (zoomLevel <= 1 || e.touches.length !== 1) return
+    const t = e.touches[0]
+    setIsPanning(true)
+    setPanStart({ x: t.clientX - panOffset.x, y: t.clientY - panOffset.y })
+  }
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPanning || e.touches.length !== 1) return
+    const t = e.touches[0]
+    setPanOffset({ x: t.clientX - panStart.x, y: t.clientY - panStart.y })
+  }
+  const handleTouchEnd = () => setIsPanning(false)
 
   const confirmReview = async (e: FormEvent) => {
     e.preventDefault()
@@ -253,6 +304,8 @@ export default function VerifierPanel() {
 
   if (loading) return <div className="verifier-panel"><div className="spinner" /></div>
 
+  const imageToShow = newFotoPreview || fotoUrl
+
   return (
     <div className="verifier-panel">
       <div className="dashboard-header" style={{ marginBottom: '2rem' }}>
@@ -311,10 +364,48 @@ export default function VerifierPanel() {
           </h3>
 
           <div className="review-content">
-            {/* Image panel */}
+            {/* Image panel with zoom */}
             <div className="review-image-panel">
-              {(newFotoPreview || fotoUrl) ? (
-                <img src={newFotoPreview || fotoUrl} alt="Acta" className="review-image" />
+              {imageToShow ? (
+                <>
+                  {/* Zoom toolbar */}
+                  <div className="zoom-toolbar">
+                    <button type="button" className="zoom-btn" onClick={handleZoomOut} title="Alejar">
+                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>−</span>
+                    </button>
+                    <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
+                    <button type="button" className="zoom-btn" onClick={handleZoomIn} title="Acercar">
+                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>+</span>
+                    </button>
+                    <button type="button" className="zoom-btn" onClick={handleZoomReset} title="Restablecer">
+                      ↺
+                    </button>
+                  </div>
+                  {/* Zoomable image container */}
+                  <div
+                    ref={zoomContainerRef}
+                    className="zoom-container"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{ cursor: zoomLevel > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+                  >
+                    <img
+                      src={imageToShow}
+                      alt="Acta"
+                      className="review-image"
+                      draggable={false}
+                      style={{
+                        transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                        transition: isPanning ? 'none' : 'transform 0.2s ease',
+                      }}
+                    />
+                  </div>
+                </>
               ) : (
                 <div className="review-image-placeholder">Sin imagen del acta</div>
               )}

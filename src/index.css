@@ -955,6 +955,79 @@ body {
   }
 }
 
+/* Zoom toolbar */
+.zoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.zoom-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: var(--font);
+}
+
+.zoom-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.zoom-level {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 45px;
+  text-align: center;
+}
+
+/* Zoomable image container */
+.zoom-container {
+  width: 100%;
+  flex: 1;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.zoom-container .review-image {
+  max-height: none;
+  transform-origin: center center;
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .zoom-container {
+    min-height: 400px;
+    max-height: calc(100vh - 380px);
+  }
+}
+
 .review-image-placeholder {
   width: 100%;
   min-height: 300px;
