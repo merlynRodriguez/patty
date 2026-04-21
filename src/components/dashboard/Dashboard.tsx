@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [recintoAlcalde, setRecintoAlcalde] = useState<Totales|null>(null)
   const [recintoConcejo, setRecintoConcejo] = useState<Totales|null>(null)
   const [loadingRecinto, setLoadingRecinto] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const lastUpdated = useRef('')
 
   const fetchTotales = useCallback(async () => {
@@ -95,6 +96,30 @@ export default function Dashboard() {
     }
     fetchRecinto()
   }, [recintoId])
+
+  const handleDownloadExcel = async () => {
+    setIsDownloading(true);
+    try {
+      const res = await fetch('https://gjwiieadxireaboleims.supabase.co/functions/v1/export-excel', {
+        method: 'GET'
+      });
+      if (!res.ok) throw new Error('Error al descargar');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resultados_vinto_2026.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error(error);
+      alert('Hubo un error al generar el archivo Excel');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const getVotesArray = (t: Totales) => PARTIDO_IDS.map(pid => (t as any)[pid] as number)
   const totalVotos = (t: Totales) => getVotesArray(t).reduce((a,b)=>a+b,0)
@@ -350,6 +375,29 @@ export default function Dashboard() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Download Button */}
+      <div className="download-section" style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '2rem' }}>
+        <button 
+          onClick={handleDownloadExcel} 
+          disabled={isDownloading}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#0d143b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            cursor: isDownloading ? 'not-allowed' : 'pointer',
+            opacity: isDownloading ? 0.7 : 1,
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          {isDownloading ? 'Generando Excel...' : 'Descargar datos'}
+        </button>
       </div>
     </div>
   )
